@@ -60,3 +60,73 @@ param(
     }
     $Result
 }
+
+function Get-FileTail
+{
+    <#
+.SYNOPSIS
+
+    Monitors a file and prints any additional content to the console.
+    Aliases:  Tail
+.DESCRIPTION
+
+    Monitors a file and prints any additional content to the console.
+    Aliases:  Tail
+.PARAMETER File
+
+    The path of the file to Tail.
+.PARAMETER InitialLines
+
+    The amount of lines to load into the console on first read. Default is 0, which will allow for only new content written after the start of the command to be shown.
+    Specifying -1 will load all content of the file into the console initially.  This could cause performance impact on larger files.
+    Alias:  Lines
+.EXAMPLE
+
+    Get-FileTail -File C:\Test.log
+    Prints all content of a file that is written after the monitoring starts. 
+.EXAMPLE
+
+    Get-FileTail -File C:\Test.log -InitialLines -1
+    Prints all existing and new content of a file to the console.
+.EXAMPLE
+
+    Get-FileTail -File C:\Test.log -InitialLines 5
+    Prints the last 5 lines and new content of a file to the console.
+.EXAMPLE
+
+    Tail -File C:\Test.log
+    Functions the same as the first example, simply uses the 'Tail' alias for this function.
+#>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory=$true,ValueFromPipeline=$true)]
+        [ValidateScript({Test-Path $_ -PathType 'Leaf'})]
+        [string]$File,
+        [Parameter(Mandatory=$false)]
+        [Alias("Lines")]
+        [int32]$InitialLines=0
+    )
+    # Using cat instead of Get-Content to further make this 'Linuxy'
+    if ($InitialLines -eq -1) {
+        Write-Host "Starting monitoring of $File with all existing content to be loaded first." -ForegroundColor Yellow
+    }else{
+        Write-Host "Starting monitoring of $File with $InitialLines initial lines to be loaded first." -ForegroundColor Yellow
+    }
+    Write-Host "Press CTRL + C to cancel this operation." -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host ""
+    try {
+        cat $File -Wait -Tail $InitialLines
+    }
+    catch {
+        Write-Host ""
+        Write-Host ""
+        Write-Host "The process was interrupted:" -ForegroundColor Red -BackgroundColor Black
+        $_.Exception
+    }finally{
+        Write-Host ""
+        Write-Host ""
+        Write-Host "Finished tailing $File" -ForegroundColor Yellow
+    }
+}
+New-Alias -Name Tail -Value Get-FileTail -Scope Global
