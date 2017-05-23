@@ -130,3 +130,103 @@ function Get-FileTail
     }
 }
 New-Alias -Name Tail -Value Get-FileTail -Scope Global
+
+function New-Shortcut
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$Source,
+        [Parameter(Mandatory=$true)]
+        [string]$Destination,
+        [Parameter(Mandatory=$false)]
+        [string]$ExecutionArgs,
+        [Parameter(Mandatory=$false)]
+        [string]$Description,
+        [Parameter(Mandatory=$false)]
+        [Switch]$CreateNestedDirs,
+        [Parameter(Mandatory=$false)]
+        [Switch]$Overwrite
+    )
+    # Normalize slashes in Source and Destination
+    $Source = $Source.Replace("/","\")
+    $Destination = $Destination.Replace("/","\")
+
+    # Create full Source Directory
+    if ($Source[0] -match "[A-Z]" -and $Source[1] -match ":" -and $Source[2] -match "\\") {
+        # Source is a valid full path, no need to do anything else.
+    }else{
+        # Destination is not a valid full path, joining the current directory with the specified $Source value.
+        $Source = Join-Path((Get-Item ".").FullName, $Source)
+    }
+    $SourceParent = $Source.Remove($Source.LastIndexOf('\'))
+
+    # Create full Destination Directory
+    if ($Destination[0] -match "[A-Z]" -and $Destination[1] -match ":" -and $Destination[2] -match "\\") {
+        # Destination is a valid full path, no need to do anything else.
+    }else{
+        # Destination is not a valid full path, joining the current directory with the specified $Destination value.
+        $Destination = Join-Path((Get-Item ".").FullName, $Destination)
+    }
+    $DestParent = $Destination.Remove($Destination.LastIndexOf('\'))
+    
+    # Check for Existence of Destination's Parent Directory
+    if (Test-Path $DestParent) {
+        # Parent exists, no need to do anything else.
+    }else {
+        if ($CreateNestedDirs) {
+            try {
+                New-Item -ItemType Directory -Path $DestParent
+            }
+            catch {
+                Write-Eror "An error occured attempting to created the nested path for the shortcut. Please check your paths and permissions and try again."
+                exit
+            }
+        }else{
+            Write-Error "The parent directory for the requested shorcut does not exist and -CreateNestedDirs was not specified. The process cannot continue."
+            exit
+        }
+    }
+
+    # Check if Destination Exists
+    if (Test-Path $Destination) {
+        # Destination Exists
+        if ($Overwrite) {
+            Remove-Item $Destination -Force
+        }else {
+            Write-Error "The Destination shortcut already exists and -Overwrite was not specified. The process cannot continue."
+            Exit
+        }
+    }
+
+    # Check is Source Exists and Create Shortcut if So
+    if (Test-Path $Source) {
+        # Source Exists
+        try {
+            # All pre-checks and pre-process items completed successfully, proceeding with shortcut creation.
+            $Shell = New-Object -ComObject ("WScript.Shell")
+            $ShortCut = $Shell.CreateShortcut($Destination)
+            $ShortCut.TargetPath=$Source
+            if ($ExecutionArgs) {
+            $ShortCut.Arguments= $ExecutionArgs  
+            }
+            $ShortCut.WorkingDirectory = $SourceParent
+            # $ShortCut.WindowStyle = 1
+            # $ShortCut.Hotkey = "CTRL+SHIFT+F"
+            $ShortCut.IconLocation = "$Source, 0"
+            if ($Description) {
+                $ShortCut.Description = $Description 
+            }
+            $ShortCut.Save()
+            $ShortCut = $null
+            $Shell = $null
+        }
+        catch {
+            # An Error Occured
+            Write-Error "An error occured while creating the shortcut:"
+            Write-Error $_
+        }
+    }else{
+        Write-Error "The Source file or folder does not exist, please check your inputs and try again."
+    }
+}
