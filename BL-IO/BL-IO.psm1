@@ -278,7 +278,6 @@ param(
                 $Domain = "."
             }
             $Ext = [System.IO.Path]::GetExtension($LogPath)
-            $sw = New-Object System.IO.StreamWriter($LogPath,$true)
             if((Test-Path $LogDirectory) -eq $False){
                 New-Item -ItemType Directory -Path $LogDirectory -Force | Out-Null
                 $DirExisted = $False
@@ -286,10 +285,12 @@ param(
             if ((Test-Path $LogPath) -eq $False) {
                 New-Item -ItemType File -Path $LogPath | Out-Null
                 $FileExisted = $False
+                $sw = New-Object System.IO.StreamWriter($LogPath,$true)
             }else {
+                $sw = New-Object System.IO.StreamWriter($LogPath,$true)
                 if ($finfo.Length -gt 5242880) {
                     # fInfo.Length > 1048576 for 1MB
-                    $LogFileRollover = $LogPath.Replace($Ext,"") + (Get-Date).ToString().Replace("/","-").Replace(":",".") + "$($Ext)_"
+                    $LogFileRollover = $LogPath.Replace($Ext,"_") + (Get-Date).ToString().Replace("/","-").Replace(":",".").Replace(" ", "_") + "$($Ext)_"
                     $sw.WriteLine("Log file is greater than 5 MB, beginning new log file.  Existing log file will be renamed to " + $LogFileRollover)
                     $sw.WriteLine("End log")
                     $sw.Close()
@@ -305,7 +306,7 @@ param(
                 $sw.WriteLine((Get-Date).ToString() + " $Domain\$User" + "  ::::  " + "Creating directory " + $LogDirectory)
             }
             if ($FileExisted -eq $False) {
-                $sw.WriteLine((Get-Date).ToString() + " $Domain\$User" + "  ::::  " + "Creating directory " + $LogPath)
+                $sw.WriteLine((Get-Date).ToString() + " $Domain\$User" + "  ::::  " + "Creating file " + $LogPath)
             }
             $sw.WriteLine((Get-Date).ToString() + " $Domain\$User" + "  ::::  " + $LineText)
             $sw.Close()
