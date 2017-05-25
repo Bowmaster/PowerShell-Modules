@@ -1,5 +1,3 @@
-function Get-ShortName 
-{
 <#
 .SYNOPSIS
 
@@ -41,6 +39,8 @@ function Get-ShortName
     Get-ChildItem -Path "C:\Program Files\" | foreach-object {$_.FullName}
     Returns the shortname of each file or folder in 'C:\Program Files'
 #>
+function Get-ShortName 
+{
 [CmdletBinding()]
 param(
     [Parameter(Mandatory=$false,ValueFromPipeline=$true)]
@@ -61,9 +61,8 @@ param(
     $Result
 }
 
-function Get-FileTail
-{
-    <#
+
+<#
 .SYNOPSIS
 
     Monitors a file and prints any additional content to the console.
@@ -97,6 +96,8 @@ function Get-FileTail
     Tail -File C:\Test.log
     Functions the same as the first example, simply uses the 'Tail' alias for this function.
 #>
+function Get-FileTail
+{
     [CmdletBinding()]
     param(
         [Parameter(Mandatory=$true,ValueFromPipeline=$true)]
@@ -130,3 +131,195 @@ function Get-FileTail
     }
 }
 New-Alias -Name Tail -Value Get-FileTail -Scope Global
+
+
+<#
+function New-Shortcut
+{
+    
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$Source,
+        [Parameter(Mandatory=$true)]
+        [string]$Destination,
+        [Parameter(Mandatory=$false)]
+        [string]$ExecutionArgs,
+        [Parameter(Mandatory=$false)]
+        [string]$Description,
+        [Parameter(Mandatory=$false)]
+        [Switch]$CreateNestedDirs,
+        [Parameter(Mandatory=$false)]
+        [Switch]$Overwrite
+    )
+    # Normalize slashes in Source and Destination
+    $Source = $Source.Replace("/","\")
+    $Destination = $Destination.Replace("/","\")
+
+    # Create full Source Directory
+    if ($Source[0] -match "[A-Z]" -and $Source[1] -match ":" -and $Source[2] -match "\\") {
+        # Source is a valid full path, no need to do anything else.
+    }else{
+        # Destination is not a valid full path, joining the current directory with the specified $Source value.
+        $Source = Join-Path((Get-Item ".").FullName, $Source)
+    }
+    $SourceParent = $Source.Remove($Source.LastIndexOf('\'))
+
+    # Create full Destination Directory
+    if ($Destination[0] -match "[A-Z]" -and $Destination[1] -match ":" -and $Destination[2] -match "\\") {
+        # Destination is a valid full path, no need to do anything else.
+    }else{
+        # Destination is not a valid full path, joining the current directory with the specified $Destination value.
+        $Destination = Join-Path((Get-Item ".").FullName, $Destination)
+    }
+    $DestParent = $Destination.Remove($Destination.LastIndexOf('\'))
+    
+    # Check for Existence of Destination's Parent Directory
+    if (Test-Path $DestParent) {
+        # Parent exists, no need to do anything else.
+    }else {
+        if ($CreateNestedDirs) {
+            try {
+                New-Item -ItemType Directory -Path $DestParent
+            }
+            catch {
+                Write-Eror "An error occured attempting to created the nested path for the shortcut. Please check your paths and permissions and try again."
+                exit
+            }
+        }else{
+            Write-Error "The parent directory for the requested shorcut does not exist and -CreateNestedDirs was not specified. The process cannot continue."
+            exit
+        }
+    }
+
+    # Check if Destination Exists
+    if (Test-Path $Destination) {
+        # Destination Exists
+        if ($Overwrite) {
+            Remove-Item $Destination -Force
+        }else {
+            Write-Error "The Destination shortcut already exists and -Overwrite was not specified. The process cannot continue."
+            Exit
+        }
+    }
+
+    # Check is Source Exists and Create Shortcut if So
+    if (Test-Path $Source) {
+        # Source Exists
+        try {
+            # All pre-checks and pre-process items completed successfully, proceeding with shortcut creation.
+            $Shell = New-Object -ComObject ("WScript.Shell")
+            $ShortCut = $Shell.CreateShortcut($Destination)
+            $ShortCut.TargetPath=$Source
+            if ($ExecutionArgs) {
+            $ShortCut.Arguments= $ExecutionArgs  
+            }
+            $ShortCut.WorkingDirectory = $SourceParent
+            # $ShortCut.WindowStyle = 1
+            # $ShortCut.Hotkey = "CTRL+SHIFT+F"
+            $ShortCut.IconLocation = "$Source, 0"
+            if ($Description) {
+                $ShortCut.Description = $Description 
+            }
+            $ShortCut.Save()
+            $ShortCut = $null
+            $Shell = $null
+        }
+        catch {
+            # An Error Occured
+            Write-Error "An error occured while creating the shortcut:"
+            Write-Error $_
+        }
+    }else{
+        Write-Error "The Source file or folder does not exist, please check your inputs and try again."
+    }
+}
+#>
+
+
+<#
+.SYNOPSIS
+A more robust way to write log files.  Appends date/time information and has support for log rollover based on size.
+
+.DESCRIPTION
+A more robust way to write log files.  Appends date/time information and has support for log rollover based on size.
+
+.PARAMETER LogPath
+The path to the logfile. Required.
+
+.PARAMETER LineText
+The text to write. If ommited, a blank line will be written.
+
+.EXAMPLE
+Write-LogFile -Logpath "C:\Windows\Temp"
+
+.NOTES
+This is using the .net streamwriter class so it should be capable of very quick write operations without error or line drop.
+#>
+function Write-LogFile
+{
+[CmdletBinding()]
+param(
+[Parameter(mandatory=$true)]
+[string]$LogPath,
+[Parameter(mandatory=$false)]
+[string]$LineText=""
+) 
+    $ErrorCount = 0
+    do {
+        try {
+            $LogDirectory = [System.IO.Directory]::GetParent($LogPath).FullName
+            $DirExisted = $true
+            $FileExisted = $true
+            $fInfo = [System.IO.FileInfo]($LogPath)
+            $User = $ENV:USERNAME
+            $Domain = $ENV:USERDOMAIN
+            if ($ENV:USERDOMAIN -eq $ENV:COMPUTERNAME) {
+                $Domain = "."
+            }
+            $Ext = [System.IO.Path]::GetExtension($LogPath)
+            $sw = New-Object System.IO.StreamWriter($LogPath,$true)
+            if((Test-Path $LogDirectory) -eq $False){
+                New-Item -ItemType Directory -Path $LogDirectory -Force | Out-Null
+                $DirExisted = $False
+            }
+            if ((Test-Path $LogPath) -eq $False) {
+                New-Item -ItemType File -Path $LogPath | Out-Null
+                $FileExisted = $False
+            }else {
+                if ($finfo.Length -gt 5242880) {
+                    # fInfo.Length > 1048576 for 1MB
+                    $LogFileRollover = $LogPath.Replace($Ext,"") + (Get-Date).ToString().Replace("/","-").Replace(":",".") + "$($Ext)_"
+                    $sw.WriteLine("Log file is greater than 5 MB, beginning new log file.  Existing log file will be renamed to " + $LogFileRollover)
+                    $sw.WriteLine("End log")
+                    $sw.Close()
+                    Rename-Item -Path $LogPath -NewName $LogFileRollover
+                    Start-Sleep -Milliseconds 500
+                    New-Item -ItemType File $LogPath | Out-Null
+                    $FileExisted = $False
+                    $sw = $null
+                    $sw = New-Object System.IO.StreamWriter($LogPath,$true)
+                }   
+            }
+            if ($DirExisted -eq $false) {
+                $sw.WriteLine((Get-Date).ToString() + " $Domain\$User" + "  ::::  " + "Creating directory " + $LogDirectory)
+            }
+            if ($FileExisted -eq $False) {
+                $sw.WriteLine((Get-Date).ToString() + " $Domain\$User" + "  ::::  " + "Creating directory " + $LogPath)
+            }
+            $sw.WriteLine((Get-Date).ToString() + " $Domain\$User" + "  ::::  " + $LineText)
+            $sw.Close()
+            $sw.Dispose()
+            $sw = $null
+            $ErrorCount = 2
+        }
+        catch [System.Exception] {
+            $ErrorCount++
+            if ($ErrorCount -eq 2) {
+                Write-Error "Multiple errors occured while attempting to write the logfile file:"
+                Write-Error $_
+            }
+        }
+        
+    } until ($ErrorCount -eq 2)
+}
