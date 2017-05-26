@@ -245,13 +245,35 @@ A more robust way to write log files.  Appends date/time information and has sup
 A more robust way to write log files.  Appends date/time information and has support for log rollover based on size.
 
 .PARAMETER LogPath
-The path to the logfile. Required.
+The absolute or relative path to the logfile. Required.
+Alias = Path
 
 .PARAMETER LineText
 The text to write. If ommited, a blank line will be written.
+Alias = Text
+
+.PARAMETER WriteHost
+Allows for the text written to the log file to also be output to the console.
+Alias = WH
+
+.PARAMETER Color
+If -WriteHost is specified, allows you to specify the valid color to output to the console. If no Color is selected, white will be the default.
+Alias = C
 
 .EXAMPLE
-Write-LogFile -Logpath "C:\Windows\Temp"
+Write-LogFile -Logpath "C:\Windows\Temp" -LineText "This is a test."
+
+.EXAMPLE
+Write-LogFile -Logpath "C:\Windows\Temp" -LineText "This is a test." -WriteHost
+
+.EXAMPLE
+Write-LogFile -Logpath "C:\Windows\Temp" -LineText "This is a test." -WriteHost -Color Cyan
+
+.EXAMPLE
+Write-LogFile "C:\Windows\Temp" "This is a test." $true Magenta
+
+.EXAMPLE
+WLF "C:\Windows\Temp" "This is a test."
 
 .NOTES
 This is using the .net streamwriter class so it should be capable of very quick write operations without error or line drop.
@@ -260,15 +282,24 @@ function Write-LogFile
 {
 [CmdletBinding()]
 param(
-[Parameter(mandatory=$true)]
+[Parameter(Mandatory=$true,Position=0)]
+[Alias("Path")]
 [string]$LogPath,
-[Parameter(mandatory=$false)]
-[string]$LineText=""
+[Parameter(Mandatory=$false,Position=1)]
+[Alias("Text")]
+[string]$LineText="",
+[Parameter(Mandatory=$false,Position=2,ParameterSetName=1)]
+[Alias("WH")]
+[Switch]$WriteHost,
+[Parameter(Mandatory=$false,Position=3,ParameterSetName=1)]
+[Alias("C")]
+[ConsoleColor]$Color="White"
 ) 
     $ErrorCount = 0
     do {
         try {
-            $LogDirectory = [System.IO.Directory]::GetParent($LogPath).FullName
+            $LogPath = [System.IO.Path]::GetFullPath($LogPath)
+            $LogDirectory = [System.IO.Path]::GetDirectoryName($LogPath)
             $DirExisted = $true
             $FileExisted = $true
             $fInfo = [System.IO.FileInfo]($LogPath)
@@ -288,10 +319,12 @@ param(
                 $sw = New-Object System.IO.StreamWriter($LogPath,$true)
             }else {
                 $sw = New-Object System.IO.StreamWriter($LogPath,$true)
-                if ($finfo.Length -gt 5242880) {
-                    # fInfo.Length > 1048576 for 1MB
+                $MaxSize = 5242880
+                if ($finfo.Length -gt $MaxSize) {
+                    # fInfo.Length -gt 1048576 for 1MB
+                    # fInfo.Length -gt 5242880 for 1MB
                     $LogFileRollover = $LogPath.Replace($Ext,"_") + (Get-Date).ToString().Replace("/","-").Replace(":",".").Replace(" ", "_") + "$($Ext)_"
-                    $sw.WriteLine("Log file is greater than 5 MB, beginning new log file.  Existing log file will be renamed to " + $LogFileRollover)
+                    $sw.WriteLine("Log file is greater than " + $MaxSize / 1MB + " MB, beginning new log file.  Existing log file will be renamed to " + $LogFileRollover)
                     $sw.WriteLine("End log")
                     $sw.Close()
                     Rename-Item -Path $LogPath -NewName $LogFileRollover
@@ -303,24 +336,49 @@ param(
                 }   
             }
             if ($DirExisted -eq $false) {
-                $sw.WriteLine((Get-Date).ToString() + " $Domain\$User" + "  ::::  " + "Creating directory " + $LogDirectory)
+                $WriteLine = (Get-Date).ToString() + " $Domain\$User" + "  ::::  " + "Creating directory " + $LogDirectory
+                $sw.WriteLine($WriteLine)
+                if ($WriteHost) {
+                    Write-Host $WriteLine -ForegroundColor $Color
+                }
+                $WriteLine = $null
             }
             if ($FileExisted -eq $False) {
-                $sw.WriteLine((Get-Date).ToString() + " $Domain\$User" + "  ::::  " + "Creating file " + $LogPath)
+                $WriteLine = (Get-Date).ToString() + " $Domain\$User" + "  ::::  " + "Creating file " + $LogPath
+                $sw.WriteLine($WriteLine)
+                if ($WriteHost) {
+                    Write-Host $WriteLine -ForegroundColor $Color
+                }
+                $WriteLine = $null
+                if ($LogFileRollover) {
+                    $WriteLine = (Get-Date).ToString() + " $Domain\$User" + "  ::::  " + "Previous log: $LogFileRollover"
+                    $sw.WriteLine($WriteLine)
+                    if ($WriteHost) {
+                        Write-Host $WriteLine -ForegroundColor $Color
+                    }
+                    $WriteLine = $null
+                }
             }
-            $sw.WriteLine((Get-Date).ToString() + " $Domain\$User" + "  ::::  " + $LineText)
+            $WriteLine = (Get-Date).ToString() + " $Domain\$User" + "  ::::  " + $LineText
+            $sw.WriteLine($WriteLine)
             $sw.Close()
             $sw.Dispose()
             $sw = $null
+            if ($WriteHost) {
+                Write-Host $WriteLine -ForegroundColor $Color
+            }
+            $WriteLine = $null
             $ErrorCount = 2
         }
         catch [System.Exception] {
+            Write-Error $_
+            timeout.exe -1
             $ErrorCount++
             if ($ErrorCount -eq 2) {
-                Write-Error "Multiple errors occured while attempting to write the logfile file:"
+                Write-Error "Multiple errors occured while attempting to write the log:"
                 Write-Error $_
             }
         }
-        
     } until ($ErrorCount -eq 2)
 }
+New-Alias -Name wlf -Value Write-LogFile -Scope Global
