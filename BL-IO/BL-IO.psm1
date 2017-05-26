@@ -371,8 +371,6 @@ param(
             $ErrorCount = 2
         }
         catch [System.Exception] {
-            Write-Error $_
-            timeout.exe -1
             $ErrorCount++
             if ($ErrorCount -eq 2) {
                 Write-Error "Multiple errors occured while attempting to write the log:"
