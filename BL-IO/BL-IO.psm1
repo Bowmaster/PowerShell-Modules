@@ -253,7 +253,7 @@ The text to write. If ommited, a blank line will be written.
 Alias = Text
 
 .PARAMETER WriteHost
-Allows for the text written to the log file to also be output to the console.
+Allows for the text written to the log file, minus the information tags, to also be output to the console.
 Alias = WH
 
 .PARAMETER Color
