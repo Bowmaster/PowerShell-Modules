@@ -339,7 +339,7 @@ param(
                 $WriteLine = (Get-Date).ToString() + " $Domain\$User" + "  ::::  " + "Creating directory " + $LogDirectory
                 $sw.WriteLine($WriteLine)
                 if ($WriteHost) {
-                    Write-Host $WriteLine -ForegroundColor $Color
+                    Write-Host $LineText -ForegroundColor $Color
                 }
                 $WriteLine = $null
             }
@@ -347,14 +347,14 @@ param(
                 $WriteLine = (Get-Date).ToString() + " $Domain\$User" + "  ::::  " + "Creating file " + $LogPath
                 $sw.WriteLine($WriteLine)
                 if ($WriteHost) {
-                    Write-Host $WriteLine -ForegroundColor $Color
+                    Write-Host $LineText -ForegroundColor $Color
                 }
                 $WriteLine = $null
                 if ($LogFileRollover) {
                     $WriteLine = (Get-Date).ToString() + " $Domain\$User" + "  ::::  " + "Previous log: $LogFileRollover"
                     $sw.WriteLine($WriteLine)
                     if ($WriteHost) {
-                        Write-Host $WriteLine -ForegroundColor $Color
+                        Write-Host $LineText -ForegroundColor $Color
                     }
                     $WriteLine = $null
                 }
@@ -365,7 +365,7 @@ param(
             $sw.Dispose()
             $sw = $null
             if ($WriteHost) {
-                Write-Host $WriteLine -ForegroundColor $Color
+                Write-Host $LineText -ForegroundColor $Color
             }
             $WriteLine = $null
             $ErrorCount = 2
